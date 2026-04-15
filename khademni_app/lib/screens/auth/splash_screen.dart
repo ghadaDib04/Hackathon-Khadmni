@@ -21,18 +21,17 @@ class _SplashScreenState extends State<SplashScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       body: SizedBox.expand(
-        // ← Prend TOUT l'écran, plus de bande blanche
         child: Container(
           decoration: const BoxDecoration(
             gradient: LinearGradient(
               begin: Alignment.topLeft,
               end: Alignment.bottomRight,
               colors: [
-                AppColors.retroTeal, // ← Bleu teal en haut à gauche
-                AppColors.burntOrange, // ← Orange au milieu
-                AppColors.rustRed, // ← Rouge en bas à droite
+                AppColors.retroTeal,
+                AppColors.burntOrange,
+                AppColors.rustRed,
               ],
-              stops: [0.0, 0.5, 1.0], // Répartition des couleurs
+              stops: [0.0, 0.5, 1.0],
             ),
           ),
           child: SafeArea(
@@ -41,7 +40,6 @@ class _SplashScreenState extends State<SplashScreen> {
               children: [
                 const Spacer(),
 
-                // Icône avec bicolore
                 Container(
                   width: 100,
                   height: 100,
@@ -69,7 +67,6 @@ class _SplashScreenState extends State<SplashScreen> {
 
                 const SizedBox(height: 40),
 
-                // Titre
                 const Text(
                   'KHADEMNI',
                   style: TextStyle(
@@ -89,9 +86,8 @@ class _SplashScreenState extends State<SplashScreen> {
 
                 const SizedBox(height: 16),
 
-                // Tagline
                 Text(
-                  'Monétise ton temps. Valorise tes skills.',
+                  'Monetize your time. Value your skills.',
                   style: TextStyle(
                     color: Colors.white.withOpacity(0.95),
                     fontSize: 16,
@@ -102,7 +98,6 @@ class _SplashScreenState extends State<SplashScreen> {
 
                 const Spacer(),
 
-                // Loading bar avec les 3 couleurs
                 Container(
                   width: 140,
                   height: 4,
@@ -123,7 +118,6 @@ class _SplashScreenState extends State<SplashScreen> {
 
                 const SizedBox(height: 60),
 
-                // Footer
                 Text(
                   'POWERED BY THE DIGITAL HEARTH',
                   style: TextStyle(

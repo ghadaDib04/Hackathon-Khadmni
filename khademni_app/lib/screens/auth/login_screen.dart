@@ -1,5 +1,8 @@
 import 'package:flutter/material.dart';
+import 'package:dio/dio.dart';
 import '../../theme/app_theme.dart';
+import '../../core/storage.dart';
+import '../../core/api_service.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -12,6 +15,27 @@ class _LoginScreenState extends State<LoginScreen> {
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
   bool _obscurePassword = true;
+  bool _loading = false;
+
+  Future<void> _login() async {
+    setState(() => _loading = true);
+    try {
+      final response = await ApiService.post('/auth/login', data: {
+        'email': _emailController.text.trim(),
+        'password': _passwordController.text,
+      });
+      await Storage.saveToken(response.data['token']);
+      await Storage.saveUser(response.data['user']);
+      ApiService.setToken(response.data['token']);
+      if (mounted) Navigator.pushReplacementNamed(context, '/home');
+    } catch (e) {
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Invalid email or password')),
+      );
+    } finally {
+      if (mounted) setState(() => _loading = false);
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -51,9 +75,8 @@ class _LoginScreenState extends State<LoginScreen> {
 
               const SizedBox(height: 40),
 
-              // Titre
               const Text(
-                'Bienvenue au campus\nnumérique.',
+                'Welcome to the\ndigital campus.',
                 style: TextStyle(
                   color: AppColors.textPrimary,
                   fontSize: 32,
@@ -65,7 +88,7 @@ class _LoginScreenState extends State<LoginScreen> {
               const SizedBox(height: 12),
 
               Text(
-                'Connectez-vous pour accéder aux missions et services de la communauté.',
+                'Sign in to access missions and community services.',
                 style: TextStyle(
                   color: AppColors.textSecondary,
                   fontSize: 15,
@@ -76,13 +99,13 @@ class _LoginScreenState extends State<LoginScreen> {
               const SizedBox(height: 40),
 
               // Email
-              _buildLabel('ADRESSE EMAIL'),
+              _buildLabel('EMAIL ADDRESS'),
               const SizedBox(height: 8),
               TextField(
                 controller: _emailController,
                 keyboardType: TextInputType.emailAddress,
                 decoration: InputDecoration(
-                  hintText: 'nom@etudiant.tn',
+                  hintText: 'name@student.com',
                   hintStyle: TextStyle(color: AppColors.textDisabled),
                   filled: true,
                   fillColor: AppColors.surface,
@@ -100,20 +123,7 @@ class _LoginScreenState extends State<LoginScreen> {
               const SizedBox(height: 24),
 
               // Password
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  _buildLabel('MOT DE PASSE'),
-                  Text(
-                    'Oublié ?',
-                    style: TextStyle(
-                      color: AppColors.retroTeal,
-                      fontSize: 13,
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
-                ],
-              ),
+              _buildLabel('PASSWORD'),
               const SizedBox(height: 8),
               TextField(
                 controller: _passwordController,
@@ -149,14 +159,12 @@ class _LoginScreenState extends State<LoginScreen> {
 
               const SizedBox(height: 32),
 
-              // Bouton Connexion
+              // Login button
               SizedBox(
                 width: double.infinity,
                 height: 56,
                 child: ElevatedButton(
-                  onPressed: () {
-                    Navigator.pushReplacementNamed(context, '/home');
-                  },
+                  onPressed: _loading ? null : _login,
                   style: ElevatedButton.styleFrom(
                     backgroundColor: AppColors.burntOrange,
                     foregroundColor: Colors.white,
@@ -165,45 +173,14 @@ class _LoginScreenState extends State<LoginScreen> {
                     ),
                     elevation: 0,
                   ),
-                  child: const Text(
-                    'Se connecter',
-                    style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700),
+                  child: _loading
+                      ? const CircularProgressIndicator(color: Colors.white)
+                      : const Text(
+                    'Sign in',
+                    style: TextStyle(
+                        fontSize: 16, fontWeight: FontWeight.w700),
                   ),
                 ),
-              ),
-
-              const SizedBox(height: 24),
-
-              // Divider
-              Row(
-                children: [
-                  Expanded(child: Divider(color: AppColors.borderLight)),
-                  Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 16),
-                    child: Text(
-                      'OU CONTINUER AVEC',
-                      style: TextStyle(
-                        color: AppColors.textDisabled,
-                        fontSize: 12,
-                        letterSpacing: 1,
-                      ),
-                    ),
-                  ),
-                  Expanded(child: Divider(color: AppColors.borderLight)),
-                ],
-              ),
-
-              const SizedBox(height: 24),
-
-              // Social buttons
-              Row(
-                children: [
-                  Expanded(
-                    child: _socialButton('Google', Icons.g_mobiledata_rounded),
-                  ),
-                  const SizedBox(width: 12),
-                  Expanded(child: _socialButton('Apple', Icons.apple)),
-                ],
               ),
 
               const SizedBox(height: 40),
@@ -214,13 +191,13 @@ class _LoginScreenState extends State<LoginScreen> {
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
                     Text(
-                      'Pas encore de compte ? ',
+                      'No account yet? ',
                       style: TextStyle(color: AppColors.textSecondary),
                     ),
                     GestureDetector(
                       onTap: () => Navigator.pushNamed(context, '/register'),
                       child: Text(
-                        'Créer un compte',
+                        'Create one',
                         style: TextStyle(
                           color: AppColors.retroTeal,
                           fontWeight: FontWeight.bold,
@@ -233,15 +210,14 @@ class _LoginScreenState extends State<LoginScreen> {
 
               const SizedBox(height: 20),
 
-              // Footer links
               Row(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  _footerLink('CONDITIONS'),
+                  _footerLink('TERMS'),
                   const SizedBox(width: 24),
-                  _footerLink('CONFIDENTIALITÉ'),
+                  _footerLink('PRIVACY'),
                   const SizedBox(width: 24),
-                  _footerLink('AIDE'),
+                  _footerLink('HELP'),
                 ],
               ),
 
@@ -261,20 +237,6 @@ class _LoginScreenState extends State<LoginScreen> {
         fontWeight: FontWeight.w700,
         color: AppColors.textSecondary,
         letterSpacing: 1,
-      ),
-    );
-  }
-
-  Widget _socialButton(String label, IconData icon) {
-    return OutlinedButton.icon(
-      onPressed: () {},
-      icon: Icon(icon, size: 20, color: AppColors.textPrimary),
-      label: Text(label, style: TextStyle(color: AppColors.textPrimary)),
-      style: OutlinedButton.styleFrom(
-        backgroundColor: AppColors.surface,
-        side: BorderSide(color: AppColors.borderLight),
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-        padding: const EdgeInsets.symmetric(vertical: 12),
       ),
     );
   }

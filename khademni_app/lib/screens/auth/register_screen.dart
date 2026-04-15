@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import '../../theme/app_theme.dart';
+import '../../core/api_service.dart';
+import '../../core/storage.dart';
 
 class RegisterScreen extends StatefulWidget {
   const RegisterScreen({super.key});
@@ -14,17 +16,51 @@ class _RegisterScreenState extends State<RegisterScreen> {
   final _passwordController = TextEditingController();
   String? _selectedUniversity;
   int _currentStep = 1;
+  bool _loading = false;
 
   final List<String> _skills = [
     'Design',
     'Dev',
-    'Traduction',
-    'Cours',
-    'Courses',
+    'Translation',
+    'Tutoring',
+    'Errands',
   ];
   final List<String> _selectedSkills = [];
 
   final List<String> _universities = ['ESSTHS', 'IHEC', 'INSAT', 'FSG', 'ENIT'];
+
+  Future<void> _register() async {
+    if (_nameController.text.isEmpty ||
+        _emailController.text.isEmpty ||
+        _passwordController.text.isEmpty ||
+        _selectedUniversity == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Please fill all fields')),
+      );
+      return;
+    }
+
+    setState(() => _loading = true);
+    try {
+      final response = await ApiService.post('/auth/register', data: {
+        'name': _nameController.text.trim(),
+        'email': _emailController.text.trim(),
+        'password': _passwordController.text,
+        'university': _selectedUniversity,
+        'skills': _selectedSkills.join(', '),
+      });
+      await Storage.saveToken(response.data['token']);
+      await Storage.saveUser(response.data['user']);
+      ApiService.setToken(response.data['token']);
+      if (mounted) Navigator.pushReplacementNamed(context, '/home');
+    } catch (e) {
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Email already registered or server error')),
+      );
+    } finally {
+      if (mounted) setState(() => _loading = false);
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -47,7 +83,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
                 borderRadius: BorderRadius.circular(20),
               ),
               child: Text(
-                'ÉTAPE $_currentStep SUR 2',
+                'STEP $_currentStep OF 2',
                 style: TextStyle(
                   color: AppColors.textSecondary,
                   fontSize: 12,
@@ -65,7 +101,6 @@ class _RegisterScreenState extends State<RegisterScreen> {
           children: [
             const SizedBox(height: 20),
 
-            // Logo
             Text(
               'KHADEMNI',
               style: TextStyle(
@@ -78,9 +113,8 @@ class _RegisterScreenState extends State<RegisterScreen> {
 
             const SizedBox(height: 24),
 
-            // Titre
             Text(
-              'Rejoignez la communauté étudiante la plus active de Tunisie.',
+              'Join the most active student community.',
               style: TextStyle(
                 color: AppColors.textPrimary,
                 fontSize: 18,
@@ -91,9 +125,9 @@ class _RegisterScreenState extends State<RegisterScreen> {
 
             const SizedBox(height: 32),
 
-            // Step 1 : Informations
+            // Step 1
             if (_currentStep == 1) ...[
-              _buildLabel('NOM COMPLET'),
+              _buildLabel('FULL NAME'),
               const SizedBox(height: 8),
               TextField(
                 controller: _nameController,
@@ -106,21 +140,19 @@ class _RegisterScreenState extends State<RegisterScreen> {
                     borderRadius: BorderRadius.circular(12),
                     borderSide: BorderSide.none,
                   ),
-                  prefixIcon: Icon(
-                    Icons.person_outline,
-                    color: AppColors.textSecondary,
-                  ),
+                  prefixIcon: Icon(Icons.person_outline, color: AppColors.textSecondary),
                 ),
               ),
 
               const SizedBox(height: 20),
 
-              _buildLabel('EMAIL UNIVERSITAIRE'),
+              _buildLabel('UNIVERSITY EMAIL'),
               const SizedBox(height: 8),
               TextField(
                 controller: _emailController,
+                keyboardType: TextInputType.emailAddress,
                 decoration: InputDecoration(
-                  hintText: 'nom@universite.tn',
+                  hintText: 'name@university.com',
                   hintStyle: TextStyle(color: AppColors.textDisabled),
                   filled: true,
                   fillColor: AppColors.surface,
@@ -128,16 +160,13 @@ class _RegisterScreenState extends State<RegisterScreen> {
                     borderRadius: BorderRadius.circular(12),
                     borderSide: BorderSide.none,
                   ),
-                  prefixIcon: Icon(
-                    Icons.alternate_email,
-                    color: AppColors.textSecondary,
-                  ),
+                  prefixIcon: Icon(Icons.alternate_email, color: AppColors.textSecondary),
                 ),
               ),
 
               const SizedBox(height: 20),
 
-              _buildLabel('UNIVERSITÉ'),
+              _buildLabel('UNIVERSITY'),
               const SizedBox(height: 8),
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 16),
@@ -149,14 +178,11 @@ class _RegisterScreenState extends State<RegisterScreen> {
                   child: DropdownButton<String>(
                     value: _selectedUniversity,
                     hint: Text(
-                      'Sélectionnez votre campus',
+                      'Select your campus',
                       style: TextStyle(color: AppColors.textDisabled),
                     ),
                     isExpanded: true,
-                    icon: Icon(
-                      Icons.keyboard_arrow_down,
-                      color: AppColors.textSecondary,
-                    ),
+                    icon: Icon(Icons.keyboard_arrow_down, color: AppColors.textSecondary),
                     items: _universities.map((String value) {
                       return DropdownMenuItem<String>(
                         value: value,
@@ -164,9 +190,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
                       );
                     }).toList(),
                     onChanged: (newValue) {
-                      setState(() {
-                        _selectedUniversity = newValue;
-                      });
+                      setState(() => _selectedUniversity = newValue);
                     },
                   ),
                 ),
@@ -174,7 +198,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
 
               const SizedBox(height: 20),
 
-              _buildLabel('MOT DE PASSE'),
+              _buildLabel('PASSWORD'),
               const SizedBox(height: 8),
               TextField(
                 controller: _passwordController,
@@ -188,40 +212,21 @@ class _RegisterScreenState extends State<RegisterScreen> {
                     borderRadius: BorderRadius.circular(12),
                     borderSide: BorderSide.none,
                   ),
-                  prefixIcon: Icon(
-                    Icons.lock_outline,
-                    color: AppColors.textSecondary,
-                  ),
-                  suffixIcon: Icon(
-                    Icons.visibility_off,
-                    color: AppColors.textSecondary,
-                  ),
+                  prefixIcon: Icon(Icons.lock_outline, color: AppColors.textSecondary),
+                  suffixIcon: Icon(Icons.visibility_off, color: AppColors.textSecondary),
                 ),
               ),
             ],
 
-            // Step 2 : Compétences
+            // Step 2
             if (_currentStep == 2) ...[
               const Text(
-                'Vos compétences',
+                'Your Skills',
                 style: TextStyle(
                   color: AppColors.textPrimary,
                   fontSize: 20,
                   fontWeight: FontWeight.bold,
                 ),
-              ),
-              const SizedBox(height: 4),
-              Row(
-                children: [
-                  Container(
-                    width: 4,
-                    height: 4,
-                    decoration: BoxDecoration(
-                      color: AppColors.goldenYellow,
-                      borderRadius: BorderRadius.circular(2),
-                    ),
-                  ),
-                ],
               ),
               const SizedBox(height: 24),
 
@@ -241,19 +246,12 @@ class _RegisterScreenState extends State<RegisterScreen> {
                       });
                     },
                     child: Container(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 20,
-                        vertical: 12,
-                      ),
+                      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
                       decoration: BoxDecoration(
-                        color: isSelected
-                            ? AppColors.goldenYellow
-                            : AppColors.surface,
+                        color: isSelected ? AppColors.goldenYellow : AppColors.surface,
                         borderRadius: BorderRadius.circular(24),
                         border: Border.all(
-                          color: isSelected
-                              ? AppColors.goldenYellow
-                              : AppColors.borderLight,
+                          color: isSelected ? AppColors.goldenYellow : AppColors.borderLight,
                         ),
                       ),
                       child: Row(
@@ -262,21 +260,13 @@ class _RegisterScreenState extends State<RegisterScreen> {
                           Text(
                             skill,
                             style: TextStyle(
-                              color: isSelected
-                                  ? AppColors.textPrimary
-                                  : AppColors.textSecondary,
-                              fontWeight: isSelected
-                                  ? FontWeight.w600
-                                  : FontWeight.normal,
+                              color: isSelected ? AppColors.textPrimary : AppColors.textSecondary,
+                              fontWeight: isSelected ? FontWeight.w600 : FontWeight.normal,
                             ),
                           ),
                           if (isSelected) ...[
                             const SizedBox(width: 6),
-                            Icon(
-                              Icons.check,
-                              size: 16,
-                              color: AppColors.textPrimary,
-                            ),
+                            Icon(Icons.check, size: 16, color: AppColors.textPrimary),
                           ],
                         ],
                       ),
@@ -288,16 +278,15 @@ class _RegisterScreenState extends State<RegisterScreen> {
 
             const SizedBox(height: 40),
 
-            // Bouton Suivant/Créer
             SizedBox(
               width: double.infinity,
               height: 56,
               child: ElevatedButton(
-                onPressed: () {
+                onPressed: _loading ? null : () {
                   if (_currentStep == 1) {
                     setState(() => _currentStep = 2);
                   } else {
-                    Navigator.pushReplacementNamed(context, '/home');
+                    _register();
                   }
                 },
                 style: ElevatedButton.styleFrom(
@@ -308,15 +297,14 @@ class _RegisterScreenState extends State<RegisterScreen> {
                   ),
                   elevation: 0,
                 ),
-                child: Row(
+                child: _loading
+                    ? const CircularProgressIndicator(color: Colors.white)
+                    : Row(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
                     Text(
-                      _currentStep == 1 ? 'Suivant' : 'Créer mon compte',
-                      style: const TextStyle(
-                        fontSize: 16,
-                        fontWeight: FontWeight.w700,
-                      ),
+                      _currentStep == 1 ? 'Next' : 'Create Account',
+                      style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w700),
                     ),
                     if (_currentStep == 1) ...[
                       const SizedBox(width: 8),
@@ -329,17 +317,16 @@ class _RegisterScreenState extends State<RegisterScreen> {
 
             const SizedBox(height: 24),
 
-            // Lien connexion
             Center(
               child: GestureDetector(
                 onTap: () => Navigator.pop(context),
                 child: RichText(
                   text: TextSpan(
-                    text: 'Déjà inscrit ? ',
+                    text: 'Already have an account? ',
                     style: TextStyle(color: AppColors.textSecondary),
                     children: [
                       TextSpan(
-                        text: 'Connexion',
+                        text: 'Sign in',
                         style: TextStyle(
                           color: AppColors.burntOrange,
                           fontWeight: FontWeight.bold,
