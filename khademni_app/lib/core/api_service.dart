@@ -16,6 +16,10 @@ class ApiService {
     _dio.options.headers['Authorization'] = 'Bearer $token';
   }
 
+  static void clearToken() {
+    _dio.options.headers.remove('Authorization');
+  }
+
   static Future<Response> get(String path) => _dio.get(path);
   static Future<Response> post(String path, {dynamic data}) => _dio.post(path, data: data);
   static Future<Response> patch(String path, {dynamic data}) => _dio.patch(path, data: data);
