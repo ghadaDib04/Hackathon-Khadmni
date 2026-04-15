@@ -1,19 +1,84 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
+import '../../providers/auth_provider.dart';
 import '../../theme/app_theme.dart';
 
-class ProfileScreen extends StatelessWidget {
+class ProfileScreen extends StatefulWidget {
   const ProfileScreen({super.key});
 
   @override
+  State<ProfileScreen> createState() => _ProfileScreenState();
+}
+
+class _ProfileScreenState extends State<ProfileScreen> {
+  Map<String, dynamic>? _profile;
+  bool _loading = true;
+  String? _error;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadProfile();
+  }
+
+  Future<void> _loadProfile() async {
+    setState(() { _loading = true; _error = null; });
+    try {
+      await context.read<AuthProvider>().fetchMe();
+      final user = context.read<AuthProvider>().user;
+      setState(() { _profile = user; });
+    } catch (e) {
+      setState(() => _error = 'Failed to load profile.');
+    } finally {
+      setState(() => _loading = false);
+    }
+  }
+
+  @override
   Widget build(BuildContext context) {
+    final user = context.watch<AuthProvider>().user;
+    final name       = (user?['name'] as String?) ?? '';
+    final email      = (user?['email'] as String?) ?? '';
+    final university = (user?['university'] as String?) ?? '';
+    final skills     = (user?['skills'] as String?) ?? '';
+    final trust      = (user?['trust_score'] ?? 0).toDouble();
+    final wallet     = (user?['wallet_balance'] ?? 0).toDouble();
+    final stats      = user?['stats'] as Map<String, dynamic>? ?? {};
+    final posted     = stats['tasks_posted'] ?? 0;
+    final completed  = stats['tasks_completed'] ?? 0;
+    final initial    = name.isNotEmpty ? name[0].toUpperCase() : '?';
+    final stars      = (trust / 20).clamp(0.0, 5.0); // trust 0-100 → stars 0-5
+
     return Scaffold(
       backgroundColor: AppColors.background,
-      body: CustomScrollView(
+      body: _loading
+          ? const Center(child: CircularProgressIndicator(color: Color(0xFFBE5103)))
+          : _error != null
+          ? Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Text(_error!, style: const TextStyle(color: Colors.grey)),
+            const SizedBox(height: 16),
+            GestureDetector(
+              onTap: _loadProfile,
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFBE5103),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: const Text('Retry', style: TextStyle(color: Colors.white)),
+              ),
+            ),
+          ],
+        ),
+      )
+          : CustomScrollView(
         slivers: [
-          // AppBar avec avatar cliquable (mais on est déjà sur le profil)
           SliverAppBar(
             title: const Text(
-              'KHADEMNI',
+              'KHADMNI',
               style: TextStyle(
                 fontWeight: FontWeight.bold,
                 color: AppColors.burntOrange,
@@ -26,19 +91,28 @@ class ProfileScreen extends StatelessWidget {
               icon: const Icon(Icons.arrow_back, color: AppColors.textPrimary),
               onPressed: () => Navigator.pop(context),
             ),
+            actions: [
+              IconButton(
+                icon: const Icon(Icons.logout, color: AppColors.textPrimary),
+                onPressed: () async {
+                  await context.read<AuthProvider>().logout();
+                  if (mounted) {
+                    Navigator.pushReplacementNamed(context, '/login');
+                  }
+                },
+              ),
+            ],
           ),
 
-          // Contenu
           SliverToBoxAdapter(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                // Header avec carte orange et avatar qui dépasse
+                // Header card with avatar
                 Stack(
                   clipBehavior: Clip.none,
                   alignment: Alignment.bottomLeft,
                   children: [
-                    // Carte orange
                     Container(
                       margin: const EdgeInsets.all(20),
                       height: 160,
@@ -51,8 +125,6 @@ class ProfileScreen extends StatelessWidget {
                         borderRadius: BorderRadius.circular(28),
                       ),
                     ),
-
-                    // Avatar qui dépasse
                     Positioned(
                       left: 40,
                       bottom: -30,
@@ -62,25 +134,22 @@ class ProfileScreen extends StatelessWidget {
                           color: AppColors.background,
                           borderRadius: BorderRadius.circular(20),
                         ),
-                        child: ClipRRect(
-                          borderRadius: BorderRadius.circular(16),
-                          child: Image.network(
-                            'https://i.pravatar.cc/150?img=11',
-                            width: 90,
-                            height: 90,
-                            fit: BoxFit.cover,
-                            errorBuilder: (context, error, stackTrace) {
-                              return Container(
-                                width: 90,
-                                height: 90,
-                                color: AppColors.burntOrange,
-                                child: const Icon(
-                                  Icons.person,
-                                  color: Colors.white,
-                                  size: 40,
-                                ),
-                              );
-                            },
+                        child: Container(
+                          width: 90,
+                          height: 90,
+                          decoration: BoxDecoration(
+                            color: const Color(0xFFBE5103),
+                            borderRadius: BorderRadius.circular(16),
+                          ),
+                          child: Center(
+                            child: Text(
+                              initial,
+                              style: const TextStyle(
+                                color: Colors.white,
+                                fontSize: 36,
+                                fontWeight: FontWeight.w800,
+                              ),
+                            ),
                           ),
                         ),
                       ),
@@ -88,16 +157,15 @@ class ProfileScreen extends StatelessWidget {
                   ],
                 ),
 
-                // Espace pour l'avatar + contenu
                 Padding(
                   padding: const EdgeInsets.fromLTRB(20, 50, 20, 20),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      // Nom
-                      const Text(
-                        'Ahmed Ben Ali',
-                        style: TextStyle(
+                      // Name
+                      Text(
+                        name,
+                        style: const TextStyle(
                           fontSize: 28,
                           fontWeight: FontWeight.bold,
                           color: AppColors.textPrimary,
@@ -105,47 +173,54 @@ class ProfileScreen extends StatelessWidget {
                       ),
                       const SizedBox(height: 4),
 
-                      // Université
+                      // Email
                       Row(
                         children: [
-                          Icon(
-                            Icons.school_outlined,
-                            size: 16,
-                            color: AppColors.textSecondary,
-                          ),
+                          const Icon(Icons.email_outlined, size: 16, color: AppColors.textSecondary),
                           const SizedBox(width: 6),
-                          Text(
-                            'Université de Tunis El Manar',
-                            style: TextStyle(
-                              fontSize: 14,
-                              color: AppColors.textSecondary,
-                            ),
-                          ),
+                          Text(email, style: const TextStyle(fontSize: 13, color: AppColors.textSecondary)),
                         ],
                       ),
+                      const SizedBox(height: 4),
+
+                      // University
+                      if (university.isNotEmpty)
+                        Row(
+                          children: [
+                            const Icon(Icons.school_outlined, size: 16, color: AppColors.textSecondary),
+                            const SizedBox(width: 6),
+                            Expanded(
+                              child: Text(
+                                university,
+                                style: const TextStyle(fontSize: 14, color: AppColors.textSecondary),
+                              ),
+                            ),
+                          ],
+                        ),
                       const SizedBox(height: 8),
 
-                      // Rating
+                      // Trust score stars
                       Row(
                         children: [
-                          ...List.generate(5, (index) {
-                            return Icon(
-                              index < 4
-                                  ? Icons.star_rounded
-                                  : Icons.star_half_rounded,
-                              color: AppColors.goldenYellow,
-                              size: 18,
-                            );
+                          ...List.generate(5, (i) {
+                            if (i < stars.floor()) {
+                              return const Icon(Icons.star_rounded, color: AppColors.goldenYellow, size: 18);
+                            } else if (i < stars) {
+                              return const Icon(Icons.star_half_rounded, color: AppColors.goldenYellow, size: 18);
+                            } else {
+                              return const Icon(Icons.star_outline_rounded, color: AppColors.goldenYellow, size: 18);
+                            }
                           }),
                           const SizedBox(width: 8),
-                          const Text(
-                            '4.8',
-                            style: TextStyle(
+                          Text(
+                            trust.toStringAsFixed(0),
+                            style: const TextStyle(
                               fontSize: 16,
                               fontWeight: FontWeight.bold,
                               color: AppColors.textPrimary,
                             ),
                           ),
+                          const Text(' / 100', style: TextStyle(color: AppColors.textSecondary)),
                         ],
                       ),
                       const SizedBox(height: 24),
@@ -153,83 +228,31 @@ class ProfileScreen extends StatelessWidget {
                       // Stats
                       Row(
                         children: [
-                          _buildStatCard(
-                            'MISSIONS\nFINIES',
-                            '24',
-                            AppColors.burntOrange,
-                          ),
+                          _buildStatCard('TASKS\nCOMPLETED', completed.toString(), AppColors.burntOrange),
                           const SizedBox(width: 12),
-                          _buildStatCard('POSTÉES', '08', AppColors.retroTeal),
+                          _buildStatCard('TASKS\nPOSTED', posted.toString(), AppColors.retroTeal),
                           const SizedBox(width: 12),
-                          _buildStatCard('NOTE', '4.8', AppColors.goldenYellow),
+                          _buildStatCard('WALLET\n(DA)', wallet.toStringAsFixed(0), AppColors.goldenYellow),
                         ],
                       ),
                       const SizedBox(height: 32),
 
-                      // Compétences
-                      _buildSectionTitle('Compétences'),
-                      const SizedBox(height: 12),
-                      Wrap(
-                        spacing: 10,
-                        runSpacing: 10,
-                        children: [
-                          _buildSkillChip('Développement Web'),
-                          _buildSkillChip('Design Graphique'),
-                          _buildSkillChip('Rédaction'),
-                          _buildSkillChip('Tutoring Maths'),
-                          _buildSkillChip('Photographie'),
-                        ],
-                      ),
-                      const SizedBox(height: 32),
-
-                      // Langues
-                      _buildSectionTitle('Langues'),
-                      const SizedBox(height: 12),
-                      Wrap(
-                        spacing: 10,
-                        runSpacing: 10,
-                        children: [
-                          _buildLanguageChip('Français'),
-                          _buildLanguageChip('English'),
-                          _buildLanguageChip('العربية'),
-                        ],
-                      ),
-                      const SizedBox(height: 32),
-
-                      // Avis récents
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                        children: [
-                          _buildSectionTitle('Avis récents'),
-                          TextButton(
-                            onPressed: () {},
-                            child: Text(
-                              'Voir tout',
-                              style: TextStyle(
-                                color: AppColors.burntOrange,
-                                fontWeight: FontWeight.w600,
-                              ),
-                            ),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 16),
-                      _buildReviewCard(
-                        name: 'Sara Mansour',
-                        date: 'MARDI, 12 OCT',
-                        rating: 5,
-                        comment:
-                            '"Ahmed est très efficace et professionnel. Il a terminé mon logo en avance et le résultat est superbe. Je recommande vivement !"',
-                      ),
-                      const SizedBox(height: 12),
-                      _buildReviewCard(
-                        name: 'Karim Belhadi',
-                        date: 'DIMANCHE, 10 OCT',
-                        rating: 4,
-                        comment:
-                            '"Travail impeccable, communication fluide. À l\'écoute et réactif."',
-                      ),
-                      const SizedBox(height: 40),
+                      // Skills
+                      if (skills.isNotEmpty) ...[
+                        _buildSectionTitle('Skills'),
+                        const SizedBox(height: 12),
+                        Wrap(
+                          spacing: 10,
+                          runSpacing: 10,
+                          children: skills
+                              .split(',')
+                              .map((s) => s.trim())
+                              .where((s) => s.isNotEmpty)
+                              .map((s) => _buildSkillChip(s))
+                              .toList(),
+                        ),
+                        const SizedBox(height: 40),
+                      ],
                     ],
                   ),
                 ),
@@ -254,7 +277,7 @@ class ProfileScreen extends StatelessWidget {
             Text(
               label,
               textAlign: TextAlign.center,
-              style: TextStyle(
+              style: const TextStyle(
                 fontSize: 10,
                 fontWeight: FontWeight.w700,
                 color: AppColors.textSecondary,
@@ -266,7 +289,7 @@ class ProfileScreen extends StatelessWidget {
             Text(
               value,
               style: TextStyle(
-                fontSize: 28,
+                fontSize: 26,
                 fontWeight: FontWeight.bold,
                 color: color,
               ),
@@ -315,101 +338,6 @@ class ProfileScreen extends StatelessWidget {
           fontWeight: FontWeight.w500,
           color: AppColors.textPrimary,
         ),
-      ),
-    );
-  }
-
-  Widget _buildLanguageChip(String label) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-      decoration: BoxDecoration(
-        color: AppColors.surface,
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: AppColors.borderLight),
-      ),
-      child: Text(
-        label,
-        style: const TextStyle(
-          fontSize: 13,
-          fontWeight: FontWeight.w500,
-          color: AppColors.textPrimary,
-        ),
-      ),
-    );
-  }
-
-  Widget _buildReviewCard({
-    required String name,
-    required String date,
-    required int rating,
-    required String comment,
-  }) {
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: AppColors.surface,
-        borderRadius: BorderRadius.circular(20),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              CircleAvatar(
-                radius: 20,
-                backgroundImage: NetworkImage(
-                  'https://i.pravatar.cc/150?img=${name.length}',
-                ),
-                onBackgroundImageError: (_, __) {},
-                backgroundColor: AppColors.burntOrange,
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      name,
-                      style: const TextStyle(
-                        fontSize: 14,
-                        fontWeight: FontWeight.w700,
-                        color: AppColors.textPrimary,
-                      ),
-                    ),
-                    Text(
-                      date,
-                      style: TextStyle(
-                        fontSize: 11,
-                        color: AppColors.textSecondary,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              Row(
-                children: List.generate(5, (index) {
-                  return Icon(
-                    index < rating
-                        ? Icons.star_rounded
-                        : Icons.star_outline_rounded,
-                    color: AppColors.goldenYellow,
-                    size: 14,
-                  );
-                }),
-              ),
-            ],
-          ),
-          const SizedBox(height: 12),
-          Text(
-            comment,
-            style: TextStyle(
-              fontSize: 14,
-              color: AppColors.textSecondary,
-              height: 1.5,
-              fontStyle: FontStyle.italic,
-            ),
-          ),
-        ],
       ),
     );
   }

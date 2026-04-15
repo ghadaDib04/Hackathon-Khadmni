@@ -26,3 +26,10 @@ class CreateTaskRequest(BaseModel):
 class BidRequest(BaseModel):
     amount: float
     message: Optional[str] = ""
+
+
+
+# ---Rating and Reviews---
+class RatingRequest(BaseModel):
+    score: int        # 1 to 5
+    comment: Optional[str] = ""

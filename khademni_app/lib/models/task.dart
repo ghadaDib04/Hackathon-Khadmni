@@ -26,13 +26,13 @@ class Task {
   factory Task.fromJson(Map<String, dynamic> json) => Task(
     id: json['id'],
     title: json['title'],
-    description: json['description'],
-    category: json['category'],
-    taskType: json['task_type'],
-    suggestedPrice: json['suggested_price']?.toDouble(),
-    aiPrice: json['ai_price']?.toDouble(),
-    status: json['status'],
-    posterId: json['poster_id'],
+    description: json['description'] ?? '',
+    category: json['category'] ?? '',
+    taskType: json['task_type'] ?? '',
+    suggestedPrice: (json['suggested_price'] as num?)?.toDouble(),
+    aiPrice: (json['ai_price'] as num?)?.toDouble(),
+    status: json['status'] ?? 'open',
+    posterId: json['poster_id'] ?? 0,
     workerId: json['worker_id'],
   );
 }

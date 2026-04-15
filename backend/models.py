@@ -61,3 +61,17 @@ class Bid(Base):
     message = Column(Text)
     status = Column(Enum(BidStatus), default=BidStatus.pending)
     created_at = Column(DateTime, default=datetime.utcnow)
+
+
+
+
+# Rating the worker after task completion and the poster
+class Rating(Base):
+    __tablename__ = "ratings"
+    id         = Column(Integer, primary_key=True, index=True)
+    task_id    = Column(Integer, ForeignKey("tasks.id"))
+    rater_id   = Column(Integer, ForeignKey("users.id"))  # who gave it
+    rated_id   = Column(Integer, ForeignKey("users.id"))  # who received it
+    score      = Column(Integer, nullable=False)           # 1 to 5
+    comment    = Column(Text, nullable=True)
+    created_at = Column(DateTime, default=datetime.utcnow)

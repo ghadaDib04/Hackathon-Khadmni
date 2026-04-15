@@ -75,6 +75,82 @@ def get_feed(
     ]
 
 
+@router.get("/my/posted")
+def my_posted_tasks(
+        db: Session = Depends(get_db),
+        current_user: models.User = Depends(get_current_user)
+):
+    tasks = (
+        db.query(models.Task)
+        .filter(models.Task.poster_id == current_user.id)
+        .order_by(models.Task.created_at.desc())
+        .all()
+    )
+
+    result = []
+    for t in tasks:
+        bid_count = db.query(models.Bid).filter(
+            models.Bid.task_id == t.id
+        ).count()
+
+        result.append({
+            "id": t.id,
+            "title": t.title,
+            "category": t.category,
+            "task_type": t.task_type,
+            "status": t.status,
+            "ai_price": t.ai_price,
+            "suggested_price": t.suggested_price,
+            "escrow_amount": t.escrow_amount,
+            "bid_count": bid_count,
+            "created_at": t.created_at
+        })
+
+    return result
+
+
+@router.get("/my/working")
+def my_working_tasks(
+        db: Session = Depends(get_db),
+        current_user: models.User = Depends(get_current_user)
+):
+    tasks = (
+        db.query(models.Task)
+        .filter(models.Task.worker_id == current_user.id)
+        .order_by(models.Task.created_at.desc())
+        .all()
+    )
+
+    result = []
+    for t in tasks:
+        # Get the accepted bid to know the agreed amount
+        accepted_bid = db.query(models.Bid).filter(
+            models.Bid.task_id == t.id,
+            models.Bid.status == models.BidStatus.accepted
+        ).first()
+
+        # Get the poster's basic info
+        poster = db.query(models.User).filter(
+            models.User.id == t.poster_id
+        ).first()
+
+        result.append({
+            "id": t.id,
+            "title": t.title,
+            "category": t.category,
+            "task_type": t.task_type,
+            "status": t.status,
+            "agreed_amount": accepted_bid.amount if accepted_bid else None,
+            "poster": {
+                "id": poster.id,
+                "name": poster.name,
+                "trust_score": poster.trust_score
+            },
+            "delivered_at": t.delivered_at,
+            "created_at": t.created_at
+        })
+
+    return result
 @router.get("/{task_id}")
 def get_task(
     task_id: int,

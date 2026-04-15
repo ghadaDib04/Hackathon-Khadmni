@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'package:shared_preferences/shared_preferences.dart';
 
 class Storage {
@@ -13,8 +14,15 @@ class Storage {
 
   static Future<void> saveUser(Map<String, dynamic> user) async {
     final prefs = await SharedPreferences.getInstance();
-    await prefs.setString('user_id', user['id'].toString());
-    await prefs.setString('user_name', user['name']);
+    await prefs.setString('user', jsonEncode(user));
+  }
+
+
+  static Future<Map<String, dynamic>?> getUser() async {
+    final prefs = await SharedPreferences.getInstance();
+    final str = prefs.getString('user');
+    if (str == null) return null;
+    return jsonDecode(str) as Map<String, dynamic>;
   }
 
   static Future<void> clear() async {

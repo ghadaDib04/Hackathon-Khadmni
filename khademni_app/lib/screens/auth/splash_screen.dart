@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
+import '../../providers/auth_provider.dart';
 import '../../theme/app_theme.dart';
 
 class SplashScreen extends StatefulWidget {
@@ -13,7 +15,13 @@ class _SplashScreenState extends State<SplashScreen> {
   void initState() {
     super.initState();
     Future.delayed(const Duration(seconds: 2), () {
-      if (mounted) Navigator.pushReplacementNamed(context, '/login');
+      if (!mounted) return;
+      final auth = context.read<AuthProvider>();
+      if (auth.isLoggedIn) {
+        Navigator.pushReplacementNamed(context, '/home');
+      } else {
+        Navigator.pushReplacementNamed(context, '/login');
+      }
     });
   }
 
@@ -39,7 +47,6 @@ class _SplashScreenState extends State<SplashScreen> {
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
                 const Spacer(),
-
                 Container(
                   width: 100,
                   height: 100,
@@ -64,9 +71,7 @@ class _SplashScreenState extends State<SplashScreen> {
                     color: Colors.white,
                   ),
                 ),
-
                 const SizedBox(height: 40),
-
                 const Text(
                   'KHADEMNI',
                   style: TextStyle(
@@ -83,9 +88,7 @@ class _SplashScreenState extends State<SplashScreen> {
                     ],
                   ),
                 ),
-
                 const SizedBox(height: 16),
-
                 Text(
                   'Monetize your time. Value your skills.',
                   style: TextStyle(
@@ -95,9 +98,7 @@ class _SplashScreenState extends State<SplashScreen> {
                   ),
                   textAlign: TextAlign.center,
                 ),
-
                 const Spacer(),
-
                 Container(
                   width: 140,
                   height: 4,
@@ -115,9 +116,7 @@ class _SplashScreenState extends State<SplashScreen> {
                     ),
                   ),
                 ),
-
                 const SizedBox(height: 60),
-
                 Text(
                   'POWERED BY THE DIGITAL HEARTH',
                   style: TextStyle(
@@ -126,7 +125,6 @@ class _SplashScreenState extends State<SplashScreen> {
                     letterSpacing: 2,
                   ),
                 ),
-
                 const SizedBox(height: 24),
               ],
             ),

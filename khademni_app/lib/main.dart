@@ -11,22 +11,25 @@ import 'screens/main_shell.dart';
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await ApiService.init();
-  runApp(const KhadmliApp());
+
+  final authProvider = AuthProvider();
+  await authProvider.loadUserFromStorage();
+
+  runApp(KhadmliApp(authProvider: authProvider));
 }
 
 class KhadmliApp extends StatelessWidget {
-  const KhadmliApp({super.key});
+  final AuthProvider authProvider;
+  const KhadmliApp({super.key, required this.authProvider});
 
   @override
   Widget build(BuildContext context) {
     return MultiProvider(
-      providers: [ChangeNotifierProvider(create: (_) => AuthProvider())],
+      providers: [ChangeNotifierProvider.value(value: authProvider)],
       child: MaterialApp(
         title: 'Khadmni',
         debugShowCheckedModeBanner: false,
-        theme: ThemeData(
-          useMaterial3: true,
-        ),
+        theme: ThemeData(useMaterial3: true),
         initialRoute: '/',
         routes: {
           '/': (_) => const SplashScreen(),

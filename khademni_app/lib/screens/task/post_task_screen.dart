@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import '../../theme/app_theme.dart';
-import '../../widgets/loading_button.dart';
+import '../../core/api_service.dart';
+import '../main_shell.dart';
 
 class PostTaskScreen extends StatefulWidget {
   const PostTaskScreen({super.key});
@@ -16,16 +16,120 @@ class _PostTaskScreenState extends State<PostTaskScreen> {
   final _descController = TextEditingController();
   final _budgetController = TextEditingController();
   String? selectedCategory;
+  bool _loading = false;
+  bool _loadingAiPrice = false;
+  double? _aiPrice;
 
-  final List<String> categories = [
-    'Services à domicile',
-    'Design',
-    'Développement',
-    'Traduction',
-    'Cours particuliers',
-    'Courses / Livraison',
-    'Autre',
+  static const List<String> categories = [
+    'errand',
+    'design',
+    'dev',
+    'tutoring',
+    'other',
   ];
+
+  static const Map<String, String> categoryLabels = {
+    'errand': 'Errands / Delivery',
+    'design': 'Design',
+    'dev': 'Development',
+    'tutoring': 'Tutoring',
+    'other': 'Other',
+  };
+
+  @override
+  void dispose() {
+    _titleController.dispose();
+    _descController.dispose();
+    _budgetController.dispose();
+    super.dispose();
+  }
+
+  Future<void> _getAiPrice() async {
+    if (_titleController.text.isEmpty || _descController.text.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Fill title and description first')),
+      );
+      return;
+    }
+    setState(() => _loadingAiPrice = true);
+    try {
+      final response = await ApiService.post('/tasks/create', data: {
+        'title': _titleController.text.trim(),
+        'description': _descController.text.trim(),
+        'category': selectedCategory ?? 'other',
+        'task_type': isPhysical ? 'physical' : 'digital',
+        'suggested_price': double.tryParse(_budgetController.text) ?? 0,
+      });
+      final aiPrice = response.data['ai_price'];
+      setState(() {
+        _aiPrice = (aiPrice as num?)?.toDouble();
+      });
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('AI suggested: ${_aiPrice?.toStringAsFixed(0)} DZD'),
+            backgroundColor: AppColors.retroTeal,
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Rejected: ${e.toString()}'),
+            backgroundColor: AppColors.rustRed,
+          ),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _loadingAiPrice = false);
+    }
+  }
+
+  Future<void> _submitTask() async {
+    if (_titleController.text.isEmpty ||
+        _descController.text.isEmpty ||
+        selectedCategory == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Please fill all fields')),
+      );
+      return;
+    }
+    setState(() => _loading = true);
+    try {
+      final response = await ApiService.post('/tasks/create', data: {
+        'title': _titleController.text.trim(),
+        'description': _descController.text.trim(),
+        'category': selectedCategory,
+        'task_type': isPhysical ? 'physical' : 'digital',
+        'suggested_price': double.tryParse(_budgetController.text) ?? 0,
+      });
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Task posted! AI price: ${response.data['ai_price']} DZD'),
+            backgroundColor: AppColors.retroTeal,
+          ),
+        );
+        Navigator.pushAndRemoveUntil(
+          context,
+          MaterialPageRoute(builder: (_) => const MainShell()),
+              (route) => false,
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Error: ${e.toString()}'),
+            backgroundColor: AppColors.rustRed,
+          ),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _loading = false);
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -33,7 +137,7 @@ class _PostTaskScreenState extends State<PostTaskScreen> {
       backgroundColor: AppColors.background,
       appBar: AppBar(
         title: const Text(
-          'CRÉATION',
+          'POST TASK',
           style: TextStyle(
             fontSize: 12,
             fontWeight: FontWeight.w600,
@@ -44,25 +148,14 @@ class _PostTaskScreenState extends State<PostTaskScreen> {
         centerTitle: false,
         backgroundColor: AppColors.background,
         elevation: 0,
-        actions: [
-          Padding(
-            padding: const EdgeInsets.only(right: 16),
-            child: CircleAvatar(
-              radius: 16,
-              backgroundColor: AppColors.burntOrange,
-              child: const Icon(Icons.person, size: 18, color: Colors.white),
-            ),
-          ),
-        ],
       ),
       body: SingleChildScrollView(
         padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // Titre "Postez votre mission"
             const Text(
-              'Postez votre\nmission',
+              'Post your\nmission',
               style: TextStyle(
                 fontSize: 28,
                 fontWeight: FontWeight.bold,
@@ -71,8 +164,8 @@ class _PostTaskScreenState extends State<PostTaskScreen> {
               ),
             ),
             const SizedBox(height: 8),
-            Text(
-              'Partagez votre besoin avec la communauté et trouvez l\'aide idéale.',
+            const Text(
+              'Share your need with the community and find the ideal help.',
               style: TextStyle(
                 fontSize: 14,
                 color: AppColors.textSecondary,
@@ -81,14 +174,13 @@ class _PostTaskScreenState extends State<PostTaskScreen> {
             ),
             const SizedBox(height: 32),
 
-            // TITRE DE LA MISSION
-            _buildLabel('TITRE DE LA MISSION'),
+            _buildLabel('TASK TITLE'),
             const SizedBox(height: 8),
             TextField(
               controller: _titleController,
               decoration: InputDecoration(
-                hintText: 'Ex : Livraison de documents, Aide au dém...',
-                hintStyle: TextStyle(
+                hintText: 'Ex: Document delivery, Logo design...',
+                hintStyle: const TextStyle(
                   color: AppColors.textDisabled,
                   fontSize: 14,
                 ),
@@ -103,49 +195,14 @@ class _PostTaskScreenState extends State<PostTaskScreen> {
             ),
             const SizedBox(height: 24),
 
-            // DESCRIPTION
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                _buildLabel('DESCRIPTION DÉTAILLÉE :'),
-                Container(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 8,
-                    vertical: 4,
-                  ),
-                  decoration: BoxDecoration(
-                    color: AppColors.goldenYellow.withOpacity(0.2),
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Icon(
-                        Icons.auto_awesome,
-                        size: 14,
-                        color: AppColors.burntOrange,
-                      ),
-                      const SizedBox(width: 4),
-                      Text(
-                        'Aide avec IA',
-                        style: TextStyle(
-                          fontSize: 11,
-                          color: AppColors.burntOrange,
-                          fontWeight: FontWeight.w600,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ],
-            ),
+            _buildLabel('DESCRIPTION'),
             const SizedBox(height: 8),
             TextField(
               controller: _descController,
               maxLines: 4,
               decoration: InputDecoration(
-                hintText: 'Décrivez les détails de la mission...',
-                hintStyle: TextStyle(
+                hintText: 'Describe the task in detail...',
+                hintStyle: const TextStyle(
                   color: AppColors.textDisabled,
                   fontSize: 14,
                 ),
@@ -160,8 +217,7 @@ class _PostTaskScreenState extends State<PostTaskScreen> {
             ),
             const SizedBox(height: 24),
 
-            // TYPE DE MISSION (Toggle comme sur la maquette)
-            _buildLabel('TYPE DE MISSION'),
+            _buildLabel('TASK TYPE'),
             const SizedBox(height: 8),
             Container(
               height: 48,
@@ -171,7 +227,6 @@ class _PostTaskScreenState extends State<PostTaskScreen> {
               ),
               child: Row(
                 children: [
-                  // Bouton Physique
                   Expanded(
                     child: GestureDetector(
                       onTap: () => setState(() => isPhysical = true),
@@ -196,13 +251,12 @@ class _PostTaskScreenState extends State<PostTaskScreen> {
                               ),
                               const SizedBox(width: 6),
                               Text(
-                                'Physique',
+                                'Physical',
                                 style: TextStyle(
                                   color: isPhysical
                                       ? Colors.white
                                       : AppColors.textSecondary,
                                   fontWeight: FontWeight.w600,
-                                  fontSize: 14,
                                 ),
                               ),
                             ],
@@ -211,7 +265,6 @@ class _PostTaskScreenState extends State<PostTaskScreen> {
                       ),
                     ),
                   ),
-                  // Bouton Digital
                   Expanded(
                     child: GestureDetector(
                       onTap: () => setState(() => isPhysical = false),
@@ -242,7 +295,6 @@ class _PostTaskScreenState extends State<PostTaskScreen> {
                                       ? Colors.white
                                       : AppColors.textSecondary,
                                   fontWeight: FontWeight.w600,
-                                  fontSize: 14,
                                 ),
                               ),
                             ],
@@ -256,7 +308,6 @@ class _PostTaskScreenState extends State<PostTaskScreen> {
             ),
             const SizedBox(height: 16),
 
-            // Info PIN (visible si physique)
             if (isPhysical)
               Container(
                 padding: const EdgeInsets.symmetric(
@@ -267,16 +318,16 @@ class _PostTaskScreenState extends State<PostTaskScreen> {
                   color: AppColors.surface,
                   borderRadius: BorderRadius.circular(12),
                 ),
-                child: Row(
+                child: const Row(
                   children: [
                     Icon(
                       Icons.lock_outline,
                       color: AppColors.textSecondary,
                       size: 20,
                     ),
-                    const SizedBox(width: 12),
+                    SizedBox(width: 12),
                     Text(
-                      'Code PIN généré automatiquement',
+                      'PIN code auto-generated on acceptance',
                       style: TextStyle(
                         color: AppColors.textSecondary,
                         fontSize: 14,
@@ -287,8 +338,7 @@ class _PostTaskScreenState extends State<PostTaskScreen> {
               ),
             const SizedBox(height: 24),
 
-            // CATÉGORIE
-            _buildLabel('CATÉGORIE'),
+            _buildLabel('CATEGORY'),
             const SizedBox(height: 8),
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 16),
@@ -299,33 +349,29 @@ class _PostTaskScreenState extends State<PostTaskScreen> {
               child: DropdownButtonHideUnderline(
                 child: DropdownButton<String>(
                   value: selectedCategory,
-                  hint: Text(
-                    'Services à domicile',
+                  hint: const Text(
+                    'Select a category',
                     style: TextStyle(color: AppColors.textSecondary),
                   ),
                   isExpanded: true,
-                  icon: Icon(
+                  icon: const Icon(
                     Icons.keyboard_arrow_down,
                     color: AppColors.textSecondary,
                   ),
                   items: categories.map((String value) {
                     return DropdownMenuItem<String>(
                       value: value,
-                      child: Text(value),
+                      child: Text(categoryLabels[value] ?? value),
                     );
                   }).toList(),
-                  onChanged: (newValue) {
-                    setState(() {
-                      selectedCategory = newValue;
-                    });
-                  },
+                  onChanged: (newValue) =>
+                      setState(() => selectedCategory = newValue),
                 ),
               ),
             ),
             const SizedBox(height: 24),
 
-            // BUDGET + IA ESTIMATOR
-            _buildLabel('BUDGET'),
+            _buildLabel('YOUR BUDGET (DZD)'),
             const SizedBox(height: 8),
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 16),
@@ -339,41 +385,26 @@ class _PostTaskScreenState extends State<PostTaskScreen> {
                     child: TextField(
                       controller: _budgetController,
                       keyboardType: TextInputType.number,
-                      decoration: InputDecoration(
-                        hintText: '0.00',
+                      decoration: const InputDecoration(
+                        hintText: '0',
                         hintStyle: TextStyle(color: AppColors.textDisabled),
                         border: InputBorder.none,
-                        contentPadding: const EdgeInsets.symmetric(
-                          vertical: 16,
-                        ),
+                        contentPadding: EdgeInsets.symmetric(vertical: 16),
                       ),
                     ),
                   ),
-                  Container(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 12,
-                      vertical: 6,
-                    ),
-                    decoration: BoxDecoration(
-                      color: AppColors.goldenYellow.withOpacity(0.2),
-                      borderRadius: BorderRadius.circular(8),
-                    ),
-                    child: Text(
-                      'dt',
-                      style: TextStyle(
-                        color: AppColors.burntOrange,
-                        fontWeight: FontWeight.w700,
-                        fontSize: 14,
-                      ),
+                  const Text(
+                    'DZD',
+                    style: TextStyle(
+                      color: AppColors.burntOrange,
+                      fontWeight: FontWeight.w700,
                     ),
                   ),
                 ],
               ),
             ),
-
             const SizedBox(height: 16),
 
-            // IA PRICE ESTIMATOR (NOUVEAU)
             Container(
               padding: const EdgeInsets.all(16),
               decoration: BoxDecoration(
@@ -389,7 +420,7 @@ class _PostTaskScreenState extends State<PostTaskScreen> {
                       color: AppColors.retroTeal.withOpacity(0.2),
                       borderRadius: BorderRadius.circular(8),
                     ),
-                    child: Icon(
+                    child: const Icon(
                       Icons.auto_awesome,
                       color: AppColors.retroTeal,
                       size: 20,
@@ -402,8 +433,8 @@ class _PostTaskScreenState extends State<PostTaskScreen> {
                       children: [
                         Row(
                           children: [
-                            Text(
-                              'Estimation IA',
+                            const Text(
+                              'AI Estimation',
                               style: TextStyle(
                                 color: AppColors.retroTeal,
                                 fontWeight: FontWeight.w700,
@@ -420,7 +451,7 @@ class _PostTaskScreenState extends State<PostTaskScreen> {
                                 color: AppColors.retroTeal,
                                 borderRadius: BorderRadius.circular(4),
                               ),
-                              child: Text(
+                              child: const Text(
                                 'BETA',
                                 style: TextStyle(
                                   color: Colors.white,
@@ -433,8 +464,10 @@ class _PostTaskScreenState extends State<PostTaskScreen> {
                         ),
                         const SizedBox(height: 4),
                         Text(
-                          'Prix suggéré : 15.500 dt pour ce type de mission',
-                          style: TextStyle(
+                          _aiPrice != null
+                              ? 'Suggested price: ${_aiPrice!.toStringAsFixed(0)} DZD'
+                              : 'Fill title & description then click Get AI Price',
+                          style: const TextStyle(
                             color: AppColors.textSecondary,
                             fontSize: 13,
                           ),
@@ -442,29 +475,56 @@ class _PostTaskScreenState extends State<PostTaskScreen> {
                       ],
                     ),
                   ),
-                  TextButton(
-                    onPressed: () {
-                      _budgetController.text = '15.500';
-                    },
-                    child: Text(
-                      'Appliquer',
-                      style: TextStyle(
-                        color: AppColors.retroTeal,
-                        fontWeight: FontWeight.w600,
+                  if (_aiPrice != null)
+                    TextButton(
+                      onPressed: () =>
+                      _budgetController.text = _aiPrice!.toStringAsFixed(0),
+                      child: const Text(
+                        'Apply',
+                        style: TextStyle(
+                          color: AppColors.retroTeal,
+                          fontWeight: FontWeight.w600,
+                        ),
                       ),
                     ),
-                  ),
                 ],
+              ),
+            ),
+            const SizedBox(height: 12),
+
+            SizedBox(
+              width: double.infinity,
+              height: 44,
+              child: OutlinedButton.icon(
+                onPressed: _loadingAiPrice ? null : _getAiPrice,
+                icon: _loadingAiPrice
+                    ? const SizedBox(
+                  width: 16,
+                  height: 16,
+                  child: CircularProgressIndicator(strokeWidth: 2),
+                )
+                    : const Icon(Icons.auto_awesome, size: 16),
+                label: Text(
+                  _loadingAiPrice ? 'Getting AI price...' : 'Get AI Price',
+                ),
+                style: OutlinedButton.styleFrom(
+                  foregroundColor: AppColors.retroTeal,
+                  side: BorderSide(
+                    color: AppColors.retroTeal.withOpacity(0.5),
+                  ),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                ),
               ),
             ),
             const SizedBox(height: 32),
 
-            // Bouton Publier
             SizedBox(
               width: double.infinity,
               height: 56,
               child: ElevatedButton(
-                onPressed: () {},
+                onPressed: _loading ? null : _submitTask,
                 style: ElevatedButton.styleFrom(
                   backgroundColor: AppColors.burntOrange,
                   foregroundColor: Colors.white,
@@ -473,58 +533,18 @@ class _PostTaskScreenState extends State<PostTaskScreen> {
                   ),
                   elevation: 0,
                 ),
-                child: const Text(
-                  'Publier la mission',
-                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700),
+                child: _loading
+                    ? const CircularProgressIndicator(color: Colors.white)
+                    : const Text(
+                  'Post Mission',
+                  style: TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.w700,
+                  ),
                 ),
               ),
             ),
-            const SizedBox(height: 24),
-
-            // Info conseil
-            Container(
-              padding: const EdgeInsets.all(16),
-              decoration: BoxDecoration(
-                color: AppColors.goldenYellow.withOpacity(0.15),
-                borderRadius: BorderRadius.circular(16),
-              ),
-              child: Row(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Icon(
-                    Icons.lightbulb_outline,
-                    color: AppColors.burntOrange,
-                    size: 20,
-                  ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          'Conseil d\'expert',
-                          style: TextStyle(
-                            color: AppColors.textPrimary,
-                            fontWeight: FontWeight.w700,
-                            fontSize: 14,
-                          ),
-                        ),
-                        const SizedBox(height: 4),
-                        Text(
-                          'Les missions avec une description précise et une photo reçoivent 3x plus d\'offres.',
-                          style: TextStyle(
-                            color: AppColors.textSecondary,
-                            fontSize: 13,
-                            height: 1.4,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ],
-              ),
-            ),
-            const SizedBox(height: 100), // Espace pour le bottom nav
+            const SizedBox(height: 100),
           ],
         ),
       ),
@@ -534,7 +554,7 @@ class _PostTaskScreenState extends State<PostTaskScreen> {
   Widget _buildLabel(String text) {
     return Text(
       text,
-      style: TextStyle(
+      style: const TextStyle(
         fontSize: 11,
         fontWeight: FontWeight.w700,
         color: AppColors.textSecondary,

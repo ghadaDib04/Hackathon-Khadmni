@@ -25,7 +25,7 @@ class _MainShellState extends State<MainShell> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      body: IndexedStack(index: _currentIndex, children: _screens),
+      body: _screens[_currentIndex],  // ← changement ici
       bottomNavigationBar: Container(
         decoration: BoxDecoration(
           color: AppColors.surface,
@@ -44,24 +44,9 @@ class _MainShellState extends State<MainShell> {
               mainAxisAlignment: MainAxisAlignment.spaceAround,
               children: [
                 _buildNavItem(0, Icons.home_outlined, Icons.home, 'ACCUEIL'),
-                _buildNavItem(
-                  1,
-                  Icons.add_circle_outline,
-                  Icons.add_circle,
-                  'POSTER',
-                ),
-                _buildNavItem(
-                  2,
-                  Icons.assignment_outlined,
-                  Icons.assignment,
-                  'MISSIONS',
-                ),
-                _buildNavItem(
-                  3,
-                  Icons.account_balance_wallet_outlined,
-                  Icons.account_balance_wallet,
-                  'PORTEFEUILLE',
-                ),
+                _buildNavItem(1, Icons.add_circle_outline, Icons.add_circle, 'POSTER'),
+                _buildNavItem(2, Icons.assignment_outlined, Icons.assignment, 'MISSIONS'),
+                _buildNavItem(3, Icons.account_balance_wallet_outlined, Icons.account_balance_wallet, 'PORTEFEUILLE'),
               ],
             ),
           ),
