@@ -4,6 +4,8 @@ from database import get_db
 from auth import hash_password, verify_password, create_access_token
 import models
 from pydantic import BaseModel
+import json
+from services.embeddings import embed
 
 router = APIRouter(prefix="/auth", tags=["auth"])
 
@@ -33,6 +35,10 @@ def register(req: RegisterRequest, db: Session = Depends(get_db)):
     )
     db.add(user)
     db.commit()
+    if user.skills:
+        vector = embed(user.skills)
+        user.skill_vector = json.dumps(vector)
+        db.commit()
     db.refresh(user)
     
     token = create_access_token(user.id)

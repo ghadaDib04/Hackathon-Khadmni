@@ -31,6 +31,7 @@ class User(Base):
     skills = Column(String, default="")
     wallet_balance = Column(Float, default=5000.0)
     trust_score = Column(Float, default=100.0)
+    skill_vector = Column(Text, nullable=True)
     created_at = Column(DateTime, default=datetime.utcnow)
 
 class Task(Base):
@@ -50,6 +51,7 @@ class Task(Base):
     poster_id = Column(Integer, ForeignKey("users.id"))
     worker_id = Column(Integer, ForeignKey("users.id"), nullable=True)
     created_at = Column(DateTime, default=datetime.utcnow)
+    task_vector = Column(Text, nullable=True)
     delivered_at = Column(DateTime, nullable=True)
 
 class Bid(Base):
