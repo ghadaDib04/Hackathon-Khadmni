@@ -4,19 +4,10 @@ from database import get_db
 from auth import hash_password, verify_password, create_access_token
 import models
 from pydantic import BaseModel
+from schemas import RegisterRequest, LoginRequest
 
 router = APIRouter(prefix="/auth", tags=["auth"])
 
-class RegisterRequest(BaseModel):
-    name: str
-    email: str
-    password: str
-    university: str
-    skills: str  # "Python, Figma, Flutter"
-
-class LoginRequest(BaseModel):
-    email: str
-    password: str
 
 @router.post("/register")
 def register(req: RegisterRequest, db: Session = Depends(get_db)):
