@@ -4,7 +4,7 @@ from database import get_db
 from models import Task, Bid, User, TaskStatus, BidStatus
 from auth import get_current_user
 from services.llm import analyze_task
-from services.escrow import hold_escrow
+# from services.escrow import hold_escrow 
 from services.embeddings import embed, score_match
 from pydantic import BaseModel
 from typing import Optional
@@ -49,7 +49,6 @@ async def create_task(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ):
-    # LLM moderation + price suggestion
     analysis = await analyze_task(data.title, data.description, data.category)
 
     if not analysis["allowed"]:
@@ -100,8 +99,6 @@ def get_feed(
     for task in tasks:
         task_vector = get_vector(task, "task_vector")
 
-        # If both vectors exist → semantic score
-        # If not → default 0.0 (still shows up, just at the bottom)
         if user_vector and task_vector:
             match = score_match(task_vector, user_vector)
         else:
@@ -120,7 +117,6 @@ def get_feed(
             "match_score": match
         })
 
-    # Sort by match score — best matches first
     result.sort(key=lambda x: x["match_score"], reverse=True)
     return result
 
@@ -139,7 +135,10 @@ def get_task(
     task_vector = get_vector(task, "task_vector")
 
     bids_data = []
-    for bid in task.bids if hasattr(task, 'bids') else db.query(Bid).filter(Bid.task_id == task_id).all():
+    # Correction : On s'assure que task.bids est accessible
+    bids = task.bids if hasattr(task, 'bids') else db.query(Bid).filter(Bid.task_id == task_id).all()
+    
+    for bid in bids:
         bidder = db.query(User).filter(User.id == bid.bidder_id).first()
         bidder_vector = get_vector(bidder, "skill_vector") if bidder else None
 
@@ -159,7 +158,6 @@ def get_task(
             "created_at": bid.created_at
         })
 
-    # Poster sees best-matched bidders first
     bids_data.sort(key=lambda x: x["match_score"], reverse=True)
 
     return {
@@ -190,16 +188,7 @@ def place_bid(
         raise HTTPException(status_code=404, detail="Task not found")
     if task.status != TaskStatus.open:
         raise HTTPException(status_code=400, detail="Task is not open for bids")
-    if task.poster_id == current_user.id:
-        raise HTTPException(status_code=400, detail="Cannot bid on your own task")
-
-    existing = db.query(Bid).filter(
-        Bid.task_id == task_id,
-        Bid.bidder_id == current_user.id
-    ).first()
-    if existing:
-        raise HTTPException(status_code=400, detail="You already placed a bid on this task")
-
+    
     bid = Bid(
         task_id=task_id,
         bidder_id=current_user.id,
@@ -230,16 +219,14 @@ def accept_bid(
     if not bid:
         raise HTTPException(status_code=404, detail="Bid not found")
 
-    # Lock money in escrow
-    hold_escrow(task, current_user, bid.amount, db)
+    # hold_escrow(task, current_user, bid.amount, db)
 
-    # Generate delivery PIN
+    # On simule le passage en cours
     task.pin = generate_pin()
     task.status = TaskStatus.in_progress
     task.worker_id = bid.bidder_id
     bid.status = BidStatus.accepted
 
-    # Reject all other bids
     db.query(Bid).filter(
         Bid.task_id == task_id,
         Bid.id != bid_id
@@ -248,7 +235,7 @@ def accept_bid(
     db.commit()
 
     return {
-        "message": "Bid accepted",
+        "message": "Bid accepted (Escrow skipped for testing)",
         "pin": task.pin,
-        "escrow_amount": task.escrow_amount
+        "status": "in_progress"
     }
